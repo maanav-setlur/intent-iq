@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { z } from "zod";
+import type { IntentLevel } from "@/hooks/useVisitorTracking";
 
 const visitorSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
@@ -14,16 +15,36 @@ const visitorSchema = z.object({
 
 export type VisitorInfo = z.infer<typeof visitorSchema>;
 
+const COPY: Record<IntentLevel, { heading: string; subheading: string; button: string }> = {
+  low: {
+    heading: "Stay in the Loop",
+    subheading: "Get updates and tips",
+    button: "Subscribe",
+  },
+  medium: {
+    heading: "Unlock Personalized Insights",
+    subheading: "Get personalized insights",
+    button: "Get Personalized Insights",
+  },
+  high: {
+    heading: "Get Your Personalized Demo",
+    subheading: "See how IntentIQ works for your team",
+    button: "Book Demo",
+  },
+};
+
 interface Props {
   open: boolean;
   onSubmit: (info: VisitorInfo) => void;
   onDismiss: () => void;
+  intentLevel?: IntentLevel;
 }
 
-export function VisitorIdentificationForm({ open, onSubmit, onDismiss }: Props) {
+export function VisitorIdentificationForm({ open, onSubmit, onDismiss, intentLevel = "medium" }: Props) {
   const [form, setForm] = useState({ name: "", email: "", company: "" });
   const [errors, setErrors] = useState<Partial<Record<keyof VisitorInfo, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+  const copy = COPY[intentLevel];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,8 +80,8 @@ export function VisitorIdentificationForm({ open, onSubmit, onDismiss }: Props) 
                   <Sparkles className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <span className="text-sm font-semibold text-foreground">IntentIQ</span>
-                  <p className="text-xs text-muted-foreground">Get personalized insights</p>
+                  <span className="text-sm font-semibold text-foreground">{copy.heading}</span>
+                  <p className="text-xs text-muted-foreground">{copy.subheading}</p>
                 </div>
               </div>
               <button
@@ -107,7 +128,7 @@ export function VisitorIdentificationForm({ open, onSubmit, onDismiss }: Props) 
                 {errors.company && <p className="mt-1 text-xs text-destructive">{errors.company}</p>}
               </div>
               <Button type="submit" className="w-full" size="sm" disabled={submitting}>
-                {submitting ? "Connecting…" : "Get Personalized Insights"}
+                {submitting ? "Connecting…" : copy.button}
               </Button>
             </form>
           </div>

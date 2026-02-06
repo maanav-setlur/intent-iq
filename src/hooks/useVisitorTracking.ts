@@ -1,17 +1,23 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { useBehaviorTracking } from "@/hooks/useBehaviorTracking";
 import type { VisitorInfo } from "@/components/VisitorIdentificationForm";
+
+export type IntentLevel = "low" | "medium" | "high";
 
 interface ProactiveMessage {
   id: string;
   content: string;
+  intent_level: IntentLevel;
   researched_insights?: string[];
+  cta?: { label: string; url: string };
 }
 
 interface TrackingResponse {
   message?: string;
+  intent_level?: IntentLevel;
   learning_stats?: Record<string, unknown>;
-  visitor?: Record<string, unknown>;
+  cta?: { label: string; url: string };
 }
 
 const API_URL =
@@ -34,104 +40,125 @@ function storeVisitor(info: VisitorInfo) {
   localStorage.setItem(VISITOR_KEY, JSON.stringify(info));
 }
 
+/** Client-side intent fallback when backend doesn't return intent_level */
+function inferIntentLevel(pagesVisited: string[], isReturn: boolean): IntentLevel {
+  const visitedPricing = pagesVisited.includes("/pricing");
+  const pageCount = pagesVisited.length;
+
+  if (visitedPricing && (pageCount >= 2 || isReturn)) return "high";
+  if (pageCount >= 2 || isReturn || visitedPricing) return "medium";
+  return "low";
+}
+
 export function useVisitorTracking() {
   const location = useLocation();
   const pageEnteredAt = useRef(Date.now());
   const [visitorInfo, setVisitorInfo] = useState<VisitorInfo | null>(getStoredVisitor);
   const [showForm, setShowForm] = useState(false);
   const [proactiveMessage, setProactiveMessage] = useState<ProactiveMessage | null>(null);
+  const [intentLevel, setIntentLevel] = useState<IntentLevel>("low");
   const formPrompted = useRef(false);
-
-  // Show form after a short delay if visitor not identified
-  useEffect(() => {
-    if (visitorInfo || formPrompted.current) return;
-    const timer = setTimeout(() => {
-      formPrompted.current = true;
-      setShowForm(true);
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [visitorInfo]);
+  const { getBehaviorData } = useBehaviorTracking();
 
   const sendPageData = useCallback(
-    async (info: VisitorInfo, page: string, duration: number) => {
+    async (info: VisitorInfo | null, page: string, duration: number) => {
       if (!API_URL) return;
+      const behavior = getBehaviorData();
       try {
         const res = await fetch(`${API_URL}/api/process-visitor`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            name: info.name,
-            email: info.email,
-            company: info.company,
+            name: info?.name || "",
+            email: info?.email || "",
+            company: info?.company || "",
             page,
             time_on_page: duration,
+            ...behavior,
           }),
         });
 
         if (res.ok) {
           const data: TrackingResponse = await res.json();
+          const level =
+            data.intent_level ||
+            inferIntentLevel(behavior.pages_visited, behavior.is_return_visitor);
+          setIntentLevel(level);
+
           if (data.message) {
             setProactiveMessage({
               id: `msg_${Date.now()}`,
               content: data.message,
+              intent_level: level,
               researched_insights: data.learning_stats
                 ? Object.entries(data.learning_stats).map(
                     ([k, v]) => `${k}: ${JSON.stringify(v)}`
                   )
                 : undefined,
+              cta: data.cta,
             });
+          }
+
+          // Show form for medium/high intent if not identified and not already prompted
+          if (
+            !info &&
+            !formPrompted.current &&
+            (level === "medium" || level === "high")
+          ) {
+            formPrompted.current = true;
+            setShowForm(true);
           }
         }
       } catch {
+        // Fallback: infer intent client-side even if API fails
+        const behavior = getBehaviorData();
+        const level = inferIntentLevel(behavior.pages_visited, behavior.is_return_visitor);
+        setIntentLevel(level);
         console.debug("[IntentIQ] Failed to send tracking data");
       }
     },
-    []
+    [getBehaviorData]
   );
 
-  // Send page data on enter (to get proactive message) and on leave (with duration)
+  // Send on page enter (anonymous or identified)
   useEffect(() => {
     pageEnteredAt.current = Date.now();
-
-    // Send immediately on page enter so widget can display response
-    if (visitorInfo) {
-      sendPageData(visitorInfo, location.pathname, 0);
-    }
+    sendPageData(visitorInfo, location.pathname, 0);
 
     return () => {
-      if (!visitorInfo) return;
       const durationSec = Math.round(
         (Date.now() - pageEnteredAt.current) / 1000
       );
-      // Use sendBeacon for cleanup to avoid lost requests
+      const behavior = getBehaviorData();
       const payload = JSON.stringify({
-        name: visitorInfo.name,
-        email: visitorInfo.email,
-        company: visitorInfo.company,
+        name: visitorInfo?.name || "",
+        email: visitorInfo?.email || "",
+        company: visitorInfo?.company || "",
         page: location.pathname,
         time_on_page: durationSec,
+        ...behavior,
       });
       navigator.sendBeacon?.(
         `${API_URL}/api/process-visitor`,
         new Blob([payload], { type: "application/json" })
       );
     };
-  }, [location.pathname, visitorInfo, sendPageData]);
+  }, [location.pathname, visitorInfo, sendPageData, getBehaviorData]);
 
   // Send on unload
   useEffect(() => {
     const handleUnload = () => {
-      if (!visitorInfo) return;
       const durationSec = Math.round(
         (Date.now() - pageEnteredAt.current) / 1000
       );
-      // Use sendBeacon for reliability on unload
+      const behavior = getBehaviorData();
       const payload = JSON.stringify({
-        name: visitorInfo.name,
-        email: visitorInfo.email,
-        company: visitorInfo.company,
+        name: visitorInfo?.name || "",
+        email: visitorInfo?.email || "",
+        company: visitorInfo?.company || "",
         page: location.pathname,
         time_on_page: durationSec,
+        ...behavior,
       });
       navigator.sendBeacon?.(
         `${API_URL}/api/process-visitor`,
@@ -140,14 +167,13 @@ export function useVisitorTracking() {
     };
     window.addEventListener("beforeunload", handleUnload);
     return () => window.removeEventListener("beforeunload", handleUnload);
-  }, [visitorInfo, location.pathname]);
+  }, [visitorInfo, location.pathname, getBehaviorData]);
 
   const identifyVisitor = useCallback(
     (info: VisitorInfo) => {
       storeVisitor(info);
       setVisitorInfo(info);
       setShowForm(false);
-      // Immediately send current page
       sendPageData(info, location.pathname, 0);
     },
     [location.pathname, sendPageData]
@@ -163,5 +189,6 @@ export function useVisitorTracking() {
     identifyVisitor,
     dismissForm,
     visitorInfo,
+    intentLevel,
   };
 }
