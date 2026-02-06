@@ -1,12 +1,15 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { z } from "zod";
 
-interface TrackingEvent {
-  type: "page_view";
-  page: string;
-  timestamp: string;
-  duration_seconds: number;
-}
+const eventSchema = z.object({
+  type: z.literal("page_view"),
+  page: z.string().max(500).regex(/^\/[a-zA-Z0-9_\/?#&=%.\-]*$/),
+  timestamp: z.string().datetime(),
+  duration_seconds: z.number().int().min(0).max(86400),
+});
+
+type TrackingEvent = z.infer<typeof eventSchema>;
 
 interface ProactiveMessage {
   id: string;
@@ -56,8 +59,11 @@ export function useVisitorTracking() {
   const flush = useCallback(async () => {
     if (eventsQueue.current.length === 0 || !API_URL) return;
 
-    const events = [...eventsQueue.current];
+    const rawEvents = [...eventsQueue.current];
     eventsQueue.current = [];
+
+    const events = rawEvents.filter((e) => eventSchema.safeParse(e).success);
+    if (events.length === 0) return;
 
     try {
       const res = await fetch(`${API_URL}/api/track-behavior`, {
