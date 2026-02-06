@@ -108,9 +108,7 @@ export function useVisitorTracking() {
               id: `msg_${Date.now()}`,
               content: data.message,
               intent_level: level,
-              researched_insights: data.learning_stats
-                ? formatLearningStats(data.learning_stats)
-                : undefined,
+              researched_insights: undefined,
               cta: data.cta,
             });
           }
