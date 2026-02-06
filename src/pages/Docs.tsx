@@ -1,5 +1,10 @@
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { FileText, Play } from "lucide-react";
+import { GatedContentModal, type GatedContentType } from "@/components/GatedContentModal";
+import { useLeadCapture } from "@/hooks/useLeadCapture";
 
 const CodeBlock = ({ code, lang = "javascript" }: { code: string; lang?: string }) => (
   <pre className="overflow-x-auto rounded-xl border bg-foreground/[0.03] p-4 text-sm leading-relaxed">
@@ -120,6 +125,15 @@ const endpoints = [
 ];
 
 export default function Docs() {
+  const [gatedModal, setGatedModal] = useState<{ open: boolean; type: GatedContentType }>({
+    open: false,
+    type: "whitepaper",
+  });
+  const { captureLead } = useLeadCapture();
+
+  const openGated = (type: GatedContentType) =>
+    setGatedModal({ open: true, type });
+
   return (
     <section className="container py-24">
       <motion.div
@@ -131,6 +145,29 @@ export default function Docs() {
         <p className="mt-3 text-lg text-muted-foreground">
           Everything you need to integrate IntentIQ into your product.
         </p>
+
+        {/* Gated content banner */}
+        <div className="mt-6 flex flex-wrap items-center gap-3 rounded-xl border bg-muted/40 px-5 py-4">
+          <span className="text-sm font-medium">Go deeper →</span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => openGated("whitepaper")}
+          >
+            <FileText className="h-4 w-4" />
+            Download White Paper
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => openGated("demo")}
+          >
+            <Play className="h-4 w-4" />
+            Try Demo
+          </Button>
+        </div>
 
         <Tabs defaultValue="quickstart" className="mt-10">
           <TabsList className="w-full justify-start overflow-x-auto">
@@ -237,6 +274,13 @@ export default function Docs() {
           </TabsContent>
         </Tabs>
       </motion.div>
+
+      <GatedContentModal
+        open={gatedModal.open}
+        onOpenChange={(open) => setGatedModal((prev) => ({ ...prev, open }))}
+        contentType={gatedModal.type}
+        onSubmit={async (data) => { await captureLead(data); }}
+      />
     </section>
   );
 }

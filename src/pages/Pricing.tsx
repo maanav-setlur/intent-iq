@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Check } from "lucide-react";
+import { Check, FileText, Play } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { GatedContentModal, type GatedContentType } from "@/components/GatedContentModal";
+import { useLeadCapture } from "@/hooks/useLeadCapture";
 
 const plans = [
   {
@@ -54,6 +57,15 @@ const plans = [
 ];
 
 export default function Pricing() {
+  const [gatedModal, setGatedModal] = useState<{ open: boolean; type: GatedContentType }>({
+    open: false,
+    type: "whitepaper",
+  });
+  const { captureLead } = useLeadCapture();
+
+  const openGated = (type: GatedContentType) =>
+    setGatedModal({ open: true, type });
+
   return (
     <section className="container py-24">
       <motion.div
@@ -120,6 +132,36 @@ export default function Pricing() {
           </motion.div>
         ))}
       </div>
+
+      {/* Gated content CTAs */}
+      <div className="mx-auto mt-12 flex flex-wrap items-center justify-center gap-3">
+        <span className="text-sm text-muted-foreground">Not ready to commit?</span>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => openGated("whitepaper")}
+        >
+          <FileText className="h-4 w-4" />
+          Download White Paper
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={() => openGated("demo")}
+        >
+          <Play className="h-4 w-4" />
+          Try Demo
+        </Button>
+      </div>
+
+      <GatedContentModal
+        open={gatedModal.open}
+        onOpenChange={(open) => setGatedModal((prev) => ({ ...prev, open }))}
+        contentType={gatedModal.type}
+        onSubmit={async (data) => { await captureLead(data); }}
+      />
     </section>
   );
 }
