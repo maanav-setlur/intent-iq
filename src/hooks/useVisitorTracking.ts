@@ -1,15 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { z } from "zod";
-
-const eventSchema = z.object({
-  type: z.literal("page_view"),
-  page: z.string().max(500).regex(/^\/[a-zA-Z0-9_\/?#&=%.\-]*$/),
-  timestamp: z.string().datetime(),
-  duration_seconds: z.number().int().min(0).max(86400),
-});
-
-type TrackingEvent = z.infer<typeof eventSchema>;
+import type { VisitorInfo } from "@/components/VisitorIdentificationForm";
 
 interface ProactiveMessage {
   id: string;
@@ -18,124 +9,143 @@ interface ProactiveMessage {
 }
 
 interface TrackingResponse {
-  success: boolean;
-  intent_score: number;
-  threshold_triggered: boolean;
-  message?: ProactiveMessage;
+  message?: string;
+  learning_stats?: Record<string, unknown>;
+  visitor?: Record<string, unknown>;
 }
 
-const generateId = () =>
-  `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+const API_URL =
+  import.meta.env.VITE_TRACKING_API_URL ||
+  "https://intent-agent-backend.onrender.com";
 
-const getVisitorId = (): string => {
-  const stored = localStorage.getItem("intentiq_visitor_id");
-  if (stored) return stored;
-  const id = `vis_${generateId()}`;
-  localStorage.setItem("intentiq_visitor_id", id);
-  return id;
-};
+const VISITOR_KEY = "intentiq_visitor_info";
 
-const getSessionId = (): string => {
-  const stored = sessionStorage.getItem("intentiq_session_id");
-  if (stored) return stored;
-  const id = `ses_${generateId()}`;
-  sessionStorage.setItem("intentiq_session_id", id);
-  return id;
-};
+function getStoredVisitor(): VisitorInfo | null {
+  try {
+    const raw = localStorage.getItem(VISITOR_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as VisitorInfo;
+  } catch {
+    return null;
+  }
+}
 
-const API_URL = import.meta.env.VITE_TRACKING_API_URL || "https://intent-agent-backend.onrender.com";
+function storeVisitor(info: VisitorInfo) {
+  localStorage.setItem(VISITOR_KEY, JSON.stringify(info));
+}
 
 export function useVisitorTracking() {
   const location = useLocation();
   const pageEnteredAt = useRef(Date.now());
-  const eventsQueue = useRef<TrackingEvent[]>([]);
-  const flushTimer = useRef<ReturnType<typeof setTimeout>>();
+  const [visitorInfo, setVisitorInfo] = useState<VisitorInfo | null>(getStoredVisitor);
+  const [showForm, setShowForm] = useState(false);
   const [proactiveMessage, setProactiveMessage] = useState<ProactiveMessage | null>(null);
-  const [intentScore, setIntentScore] = useState(0);
+  const formPrompted = useRef(false);
 
-  const visitorId = useRef(getVisitorId()).current;
-  const sessionId = useRef(getSessionId()).current;
+  // Show form after a short delay if visitor not identified
+  useEffect(() => {
+    if (visitorInfo || formPrompted.current) return;
+    const timer = setTimeout(() => {
+      formPrompted.current = true;
+      setShowForm(true);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [visitorInfo]);
 
-  const flush = useCallback(async () => {
-    if (eventsQueue.current.length === 0 || !API_URL) return;
+  const sendPageData = useCallback(
+    async (info: VisitorInfo, page: string, duration: number) => {
+      if (!API_URL) return;
+      try {
+        const res = await fetch(`${API_URL}/api/process-visitor`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: info.name,
+            email: info.email,
+            company: info.company,
+            page,
+            time_on_page: duration,
+          }),
+        });
 
-    const rawEvents = [...eventsQueue.current];
-    eventsQueue.current = [];
-
-    const events = rawEvents.filter((e) => eventSchema.safeParse(e).success);
-    if (events.length === 0) return;
-
-    try {
-      const res = await fetch(`${API_URL}/api/track-behavior`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          visitor_id: visitorId,
-          company_domain: null,
-          session_id: sessionId,
-          events,
-        }),
-      });
-
-      if (res.ok) {
-        const data: TrackingResponse = await res.json();
-        setIntentScore(data.intent_score);
-        if (data.threshold_triggered && data.message) {
-          setProactiveMessage(data.message);
+        if (res.ok) {
+          const data: TrackingResponse = await res.json();
+          if (data.message) {
+            setProactiveMessage({
+              id: `msg_${Date.now()}`,
+              content: data.message,
+              researched_insights: data.learning_stats
+                ? Object.entries(data.learning_stats).map(
+                    ([k, v]) => `${k}: ${JSON.stringify(v)}`
+                  )
+                : undefined,
+            });
+          }
         }
+      } catch {
+        console.debug("[IntentIQ] Failed to send tracking data");
       }
-    } catch {
-      // Silently handle - events are lost but that's acceptable
-      console.debug("[IntentIQ] Failed to send tracking data");
-    }
-  }, [visitorId, sessionId]);
+    },
+    []
+  );
 
-  const scheduleFlush = useCallback(() => {
-    if (flushTimer.current) clearTimeout(flushTimer.current);
-    flushTimer.current = setTimeout(flush, 2000);
-  }, [flush]);
-
-  // Track page views
+  // Send page data on navigation when visitor is identified
   useEffect(() => {
     pageEnteredAt.current = Date.now();
 
-    const event: TrackingEvent = {
-      type: "page_view",
-      page: location.pathname,
-      timestamp: new Date().toISOString(),
-      duration_seconds: 0,
-    };
-    eventsQueue.current.push(event);
-    scheduleFlush();
-
     return () => {
-      // Update duration on the last event for this page
-      const durationSec = Math.round((Date.now() - pageEnteredAt.current) / 1000);
-      const lastEvent = eventsQueue.current.find(
-        (e) => e.page === location.pathname && e.duration_seconds === 0
+      if (!visitorInfo) return;
+      const durationSec = Math.round(
+        (Date.now() - pageEnteredAt.current) / 1000
       );
-      if (lastEvent) {
-        lastEvent.duration_seconds = durationSec;
-      } else {
-        eventsQueue.current.push({
-          type: "page_view",
-          page: location.pathname,
-          timestamp: new Date().toISOString(),
-          duration_seconds: durationSec,
-        });
-      }
-      flush();
+      sendPageData(visitorInfo, location.pathname, durationSec);
     };
-  }, [location.pathname, scheduleFlush, flush]);
+  }, [location.pathname, visitorInfo, sendPageData]);
 
-  // Flush on unload
+  // Send on unload
   useEffect(() => {
-    const handleUnload = () => flush();
+    const handleUnload = () => {
+      if (!visitorInfo) return;
+      const durationSec = Math.round(
+        (Date.now() - pageEnteredAt.current) / 1000
+      );
+      // Use sendBeacon for reliability on unload
+      const payload = JSON.stringify({
+        name: visitorInfo.name,
+        email: visitorInfo.email,
+        company: visitorInfo.company,
+        page: location.pathname,
+        time_on_page: durationSec,
+      });
+      navigator.sendBeacon?.(
+        `${API_URL}/api/process-visitor`,
+        new Blob([payload], { type: "application/json" })
+      );
+    };
     window.addEventListener("beforeunload", handleUnload);
     return () => window.removeEventListener("beforeunload", handleUnload);
-  }, [flush]);
+  }, [visitorInfo, location.pathname]);
 
+  const identifyVisitor = useCallback(
+    (info: VisitorInfo) => {
+      storeVisitor(info);
+      setVisitorInfo(info);
+      setShowForm(false);
+      // Immediately send current page
+      sendPageData(info, location.pathname, 0);
+    },
+    [location.pathname, sendPageData]
+  );
+
+  const dismissForm = useCallback(() => setShowForm(false), []);
   const dismissMessage = useCallback(() => setProactiveMessage(null), []);
 
-  return { proactiveMessage, dismissMessage, intentScore };
+  return {
+    proactiveMessage,
+    dismissMessage,
+    showForm,
+    identifyVisitor,
+    dismissForm,
+    visitorInfo,
+  };
 }
