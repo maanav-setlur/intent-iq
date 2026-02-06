@@ -8,6 +8,7 @@ const links = [
   { to: "/", label: "Home" },
   { to: "/pricing", label: "Pricing" },
   { to: "/docs", label: "Docs" },
+  { to: "/dashboard", label: "Dashboard" },
 ];
 
 export function Navbar() {
