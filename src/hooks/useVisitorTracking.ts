@@ -43,7 +43,7 @@ const getSessionId = (): string => {
   return id;
 };
 
-const API_URL = import.meta.env.VITE_TRACKING_API_URL || "";
+const API_URL = import.meta.env.VITE_TRACKING_API_URL || "https://intent-agent-backend.onrender.com";
 
 export function useVisitorTracking() {
   const location = useLocation();
