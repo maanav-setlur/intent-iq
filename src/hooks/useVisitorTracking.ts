@@ -89,16 +89,32 @@ export function useVisitorTracking() {
     []
   );
 
-  // Send page data on navigation when visitor is identified
+  // Send page data on enter (to get proactive message) and on leave (with duration)
   useEffect(() => {
     pageEnteredAt.current = Date.now();
+
+    // Send immediately on page enter so widget can display response
+    if (visitorInfo) {
+      sendPageData(visitorInfo, location.pathname, 0);
+    }
 
     return () => {
       if (!visitorInfo) return;
       const durationSec = Math.round(
         (Date.now() - pageEnteredAt.current) / 1000
       );
-      sendPageData(visitorInfo, location.pathname, durationSec);
+      // Use sendBeacon for cleanup to avoid lost requests
+      const payload = JSON.stringify({
+        name: visitorInfo.name,
+        email: visitorInfo.email,
+        company: visitorInfo.company,
+        page: location.pathname,
+        time_on_page: durationSec,
+      });
+      navigator.sendBeacon?.(
+        `${API_URL}/api/process-visitor`,
+        new Blob([payload], { type: "application/json" })
+      );
     };
   }, [location.pathname, visitorInfo, sendPageData]);
 
