@@ -58,13 +58,33 @@ function formatLearningStats(stats: Record<string, unknown>): string[] {
   return insights.length > 0 ? insights : [];
 }
 
-/** Client-side intent fallback when backend doesn't return intent_level */
-function inferIntentLevel(pagesVisited: string[], isReturn: boolean): IntentLevel {
-  const visitedPricing = pagesVisited.includes("/pricing");
-  const pageCount = pagesVisited.length;
+/** Client-side intent scoring based on behavioral signals */
+function inferIntentLevel(
+  pagesVisited: string[],
+  isReturn: boolean,
+  scrollDepth: number,
+  timeOnPage: number,
+  referrer: string
+): IntentLevel {
+  let score = 0;
 
-  if (visitedPricing && (pageCount >= 2 || isReturn)) return "high";
-  if (pageCount >= 2 || isReturn || visitedPricing) return "medium";
+  if (pagesVisited.includes("/pricing")) score += 3;
+  if (isReturn) score += 2;
+
+  const pageCount = pagesVisited.length;
+  if (pageCount >= 3) score += 2;
+  else if (pageCount >= 2) score += 1;
+
+  if (scrollDepth > 85) score += 2;
+  else if (scrollDepth > 60) score += 1;
+
+  if (timeOnPage > 60) score += 2;
+  else if (timeOnPage > 30) score += 1;
+
+  if (/google|linkedin|bing/i.test(referrer)) score += 2;
+
+  if (score >= 5) return "high";
+  if (score >= 2) return "medium";
   return "low";
 }
 
@@ -100,7 +120,7 @@ export function useVisitorTracking() {
           const data: TrackingResponse = await res.json();
           const level =
             data.intent_level ||
-            inferIntentLevel(behavior.pages_visited, behavior.is_return_visitor);
+            inferIntentLevel(behavior.pages_visited, behavior.is_return_visitor, behavior.scroll_depth, duration, behavior.referrer);
           setIntentLevel(level);
 
           if (data.message) {
@@ -118,7 +138,8 @@ export function useVisitorTracking() {
       } catch {
         // Fallback: infer intent client-side even if API fails
         const behavior = getBehaviorData();
-        const level = inferIntentLevel(behavior.pages_visited, behavior.is_return_visitor);
+        const elapsed = Math.round((Date.now() - pageEnteredAt.current) / 1000);
+        const level = inferIntentLevel(behavior.pages_visited, behavior.is_return_visitor, behavior.scroll_depth, elapsed, behavior.referrer);
         setIntentLevel(level);
         console.debug("[IntentIQ] Failed to send tracking data");
       }
