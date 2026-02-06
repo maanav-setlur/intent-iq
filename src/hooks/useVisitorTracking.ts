@@ -115,15 +115,7 @@ export function useVisitorTracking() {
             });
           }
 
-          // Show form for medium/high intent if not identified and not already prompted
-          if (
-            !info &&
-            !formPrompted.current &&
-            (level === "medium" || level === "high")
-          ) {
-            formPrompted.current = true;
-            setShowForm(true);
-          }
+          // Form disabled — relying on proactive message widget only
         }
       } catch {
         // Fallback: infer intent client-side even if API fails
