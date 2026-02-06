@@ -12,6 +12,7 @@ export function Layout() {
     showForm,
     identifyVisitor,
     dismissForm,
+    intentLevel,
   } = useVisitorTracking();
 
   return (
@@ -25,6 +26,7 @@ export function Layout() {
         open={showForm}
         onSubmit={identifyVisitor}
         onDismiss={dismissForm}
+        intentLevel={intentLevel}
       />
       <ProactiveMessageWidget message={proactiveMessage} onDismiss={dismissMessage} />
     </div>
