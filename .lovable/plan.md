@@ -1,45 +1,100 @@
 
 
-## Smarter Client-Side Intent Classification
+## White Paper / Demo Gated Content with AI-Powered Outreach
 
-### What Changes
+### What We're Building
 
-Update the `inferIntentLevel` function in `src/hooks/useVisitorTracking.ts` to use a **points-based scoring system** instead of simple if/else checks. This incorporates scroll depth, time on page, and referrer source alongside the existing page visit and return visitor signals.
+Two new CTAs on the site -- "Download White Paper" and "Try Demo" -- that open a modal asking for name, email, and company. After submission, the data is sent to your backend, where your AI agent researches the visitor's company (funding rounds, ARR, etc.) and generates a personalized outreach email for you.
 
-### Scoring System
+### Frontend Changes (Lovable)
 
-Each behavioral signal contributes points:
+**1. New GatedContentModal component**
+- A reusable dialog (using the existing Radix Dialog) with two modes: "whitepaper" and "demo"
+- Each mode shows different copy (e.g., "Download Our Intent Intelligence White Paper" vs "Try the Interactive Demo")
+- Form fields: Name, Email, Company (validated with Zod, same pattern as the existing VisitorIdentificationForm)
+- On submit, POST to your backend at `/api/capture-lead` with `{ name, email, company, content_type: "whitepaper" | "demo" }`
+- Show a success state ("Check your email!" for whitepaper, redirect to a demo page for demo)
+- No data stored in localStorage -- this is server-only storage
 
-| Signal | Condition | Points |
-|---|---|---|
-| Visited /pricing | true | +3 |
-| Return visitor | true | +2 |
-| Pages visited | 2+ pages | +1 |
-| Pages visited | 3+ pages | +2 |
-| Scroll depth | > 60% | +1 |
-| Scroll depth | > 85% | +2 |
-| Time on page | > 30s | +1 |
-| Time on page | > 60s | +2 |
-| Referrer | Google/LinkedIn/Bing | +2 |
+**2. Place CTAs on key pages**
+- Homepage hero section: Add "Download White Paper" and "Try Demo" buttons alongside existing CTAs
+- Docs page: Add a sidebar or banner CTA
+- Pricing page: Add a CTA near the pricing cards
 
-Intent thresholds:
-- **High**: 5+ points
-- **Medium**: 2-4 points
-- **Low**: 0-1 points
+**3. New /demo route (optional)**
+- A simple interactive demo page that the visitor is redirected to after submitting the demo form
+- Could show the dashboard in a read-only/mock mode
+
+**4. Update useVisitorTracking hook**
+- After a gated content submission, send the lead data alongside the existing behavioral tracking payload so the backend has full context
+
+### Backend Changes (Your Engineer -- app.py)
+
+**5. New `/api/capture-lead` endpoint**
+- Accepts: `{ name, email, company, content_type, behavioral_context? }`
+- Stores the lead in your database (new `leads` table)
+- Triggers the AI research + outreach pipeline (can be async/background job)
+
+**6. AI Research Agent (new module or function)**
+- Input: company name + visitor name
+- Steps:
+  - Search for the company using an API (e.g., Crunchbase, Apollo, Clearbit, or web scraping)
+  - Gather: recent funding rounds, estimated ARR, employee count, industry, tech stack
+  - Combine with behavioral data (pages visited, intent score, time on site)
+- Output: structured company profile object
+
+**7. Outreach Generation**
+- Use an LLM (e.g., OpenAI GPT-4) to generate a personalized outreach email
+- Template inputs: visitor name, company profile, behavioral signals, content they requested
+- Store the generated email in the database for your review
+- Optionally send you a notification (email/Slack) with the draft
+
+**8. requirements.txt additions**
+- `openai` (for LLM outreach generation)
+- An enrichment API client (e.g., `apollo-api`, `clearbit`, or `requests` for custom API calls)
 
 ### Technical Details
 
-**`src/hooks/useVisitorTracking.ts`**
-- Update `inferIntentLevel` signature to accept scroll depth, time on page, and referrer in addition to pages visited and return visitor flag
-- Implement the points-based scoring logic
-- Update the two call sites (in the API success handler and the catch fallback) to pass the additional parameters from `getBehaviorData()`
+```text
+Frontend Flow:
+  Visitor clicks "Download White Paper"
+    --> GatedContentModal opens
+    --> Fills name/email/company
+    --> POST /api/capture-lead
+    --> Success state shown
+    --> Whitepaper PDF link revealed or emailed
 
-**`src/hooks/useBehaviorTracking.ts`** -- No changes needed. It already tracks `scroll_depth` and `referrer` and exposes them via `getBehaviorData()`.
+Backend Flow:
+  /api/capture-lead receives lead
+    --> Save to DB (leads table)
+    --> Async: research_company(company_name)
+       --> Query enrichment API (Crunchbase/Apollo/Clearbit)
+       --> Return { funding, arr, headcount, industry }
+    --> Async: generate_outreach(visitor, company_profile, behavior)
+       --> LLM generates personalized email draft
+       --> Save draft to DB
+       --> Notify you (email/Slack webhook)
+```
 
-### Examples
+### Files to Create/Modify (Frontend)
 
-- First-time visitor, 1 page, 10s, 20% scroll --> 0 points --> **Low**
-- Return visitor, 2 pages, 25s, 50% scroll --> 3 points --> **Medium**
-- First-time visitor from Google, on /pricing, 45s, 70% scroll --> 3+1+1+2 = 7 points --> **High**
-- Return visitor, 3 pages including /pricing, 35s --> 2+2+3+1 = 8 points --> **High**
+| File | Action |
+|------|--------|
+| `src/components/GatedContentModal.tsx` | Create -- modal with form for whitepaper/demo |
+| `src/pages/Index.tsx` | Modify -- add CTA buttons that open the modal |
+| `src/pages/Docs.tsx` | Modify -- add a CTA banner |
+| `src/hooks/useVisitorTracking.ts` | Modify -- add `captureLead()` function that POSTs to backend |
+| `src/pages/Demo.tsx` | Create (optional) -- interactive demo page |
+| `src/App.tsx` | Modify -- add /demo route if demo page is created |
+
+### What Your Engineer Needs to Build (Backend)
+
+| Item | Description |
+|------|-------------|
+| `POST /api/capture-lead` | New endpoint to receive and store lead data |
+| `leads` DB table | Store name, email, company, content_type, timestamp, intent_score |
+| Company research function | Query enrichment APIs for funding, ARR, headcount |
+| Outreach generator | LLM-powered personalized email draft |
+| Notification system | Email or Slack alert with the generated outreach draft |
+| CORS for new endpoint | Same `flask-cors` setup as existing endpoints |
 
