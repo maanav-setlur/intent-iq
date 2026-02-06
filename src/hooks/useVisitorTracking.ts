@@ -40,6 +40,24 @@ function storeVisitor(info: VisitorInfo) {
   localStorage.setItem(VISITOR_KEY, JSON.stringify(info));
 }
 
+/** Convert raw learning_stats into human-readable insight strings */
+function formatLearningStats(stats: Record<string, unknown>): string[] {
+  const insights: string[] = [];
+  for (const [key, value] of Object.entries(stats)) {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const obj = value as Record<string, unknown>;
+      const sent = obj.sent as number | undefined;
+      const rate = obj.response_rate as number | undefined;
+      if (sent && sent > 0) {
+        insights.push(`${sent} ${key} messages sent${rate ? ` (${Math.round(Number(rate) * 100)}% response rate)` : ""}`);
+      }
+    } else if (typeof value === "string") {
+      insights.push(`${key}: ${value}`);
+    }
+  }
+  return insights.length > 0 ? insights : [];
+}
+
 /** Client-side intent fallback when backend doesn't return intent_level */
 function inferIntentLevel(pagesVisited: string[], isReturn: boolean): IntentLevel {
   const visitedPricing = pagesVisited.includes("/pricing");
@@ -91,9 +109,7 @@ export function useVisitorTracking() {
               content: data.message,
               intent_level: level,
               researched_insights: data.learning_stats
-                ? Object.entries(data.learning_stats).map(
-                    ([k, v]) => `${k}: ${JSON.stringify(v)}`
-                  )
+                ? formatLearningStats(data.learning_stats)
                 : undefined,
               cta: data.cta,
             });
