@@ -1,73 +1,81 @@
-# Welcome to your Lovable project
+# IntentIQ: Closing the Intent Gap with Autonomous Research Agents
 
-## Project info
+> **⚠️ Hackathon Project:** IntentIQ is a **fictional company** built as a submission for the **Continual Learning Hackathon with Intercom AI**. It is not a real product or service.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## What is IntentIQ?
 
-## How can I edit this code?
+Most B2B websites lose **96% of visitors** without ever knowing who they were or what they wanted. IntentIQ solves this by combining **real-time behavioral intent detection** with **AI-powered autonomous research agents** to identify, enrich, and engage high-intent visitors before they bounce.
 
-There are several ways of editing your application.
+## Key Features
 
-**Use Lovable**
+- **Real-time Visitor Behavior Tracking** — Monitors scroll depth, time on page, navigation patterns, and session history to build a live intent score
+- **Intent Scoring Pipeline** — Classifies visitors into low / medium / high intent tiers and triggers appropriate engagement
+- **Gated Content Lead Capture** — White paper downloads and interactive demo requests capture name, email, and company
+- **AI-Powered Company Research & Enrichment** — Autonomous agents research the visitor's company using public data sources
+- **Personalized Outreach Email Generation** — AI drafts tailored outreach based on the visitor's behavior and company profile
+- **Proactive Messaging Widget** — Intent-aware widget adapts its messaging, styling, and CTAs based on visitor engagement level
+- **Interactive Demo Dashboard** — Live activity feed, intent distribution charts, and learning insights panel
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Tech Stack
 
-Changes made via Lovable will be committed automatically to this repo.
+| Layer | Technologies |
+|-------|-------------|
+| **Frontend** | React, Vite, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion, Recharts |
+| **Backend** | FastAPI (Python), You.com API, Google Gemini / GPT-4, Apollo/Clearbit |
+| **Hosting** | Lovable (frontend), Render (backend API) |
 
-**Use your preferred IDE**
+## Project Structure
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+```
+src/
+├── components/
+│   ├── landing/          # Hero, features, testimonials, CTA sections
+│   ├── dashboard/        # Metrics, charts, activity feed, research examples
+│   ├── GatedContentModal.tsx        # Lead capture modal (white paper / demo)
+│   ├── VisitorIdentificationForm.tsx # Intent-aware identification form
+│   └── ProactiveMessageWidget.tsx   # Adaptive engagement widget
+├── hooks/
+│   ├── useBehaviorTracking.ts  # Collects scroll, navigation, and session data
+│   ├── useVisitorTracking.ts   # Sends behavioral data to backend for scoring
+│   └── useLeadCapture.ts       # Submits lead data with behavioral context
+├── pages/
+│   ├── Index.tsx       # Landing page
+│   ├── Dashboard.tsx   # Analytics demo dashboard
+│   ├── Demo.tsx        # Interactive product demo
+│   ├── Docs.tsx        # Documentation
+│   └── Pricing.tsx     # Pricing page
+```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Getting Started
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
+```bash
+# Clone the repository
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
+# Navigate to the project directory
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start the development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The app will be available at `http://localhost:5173`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## How It Works
 
-**Use GitHub Codespaces**
+1. **Track** — A visitor lands on the site. Behavioral signals (scroll depth, pages viewed, time spent, referrer) are collected in real time.
+2. **Score** — The backend scores the visitor's intent level (low / medium / high) based on accumulated behavioral data.
+3. **Engage** — Based on intent level, a proactive message or identification form is triggered with tailored copy and CTAs.
+4. **Capture** — When the visitor submits their info (via the widget or gated content), their data is enriched with company research.
+5. **Outreach** — AI generates a personalized outreach email using the visitor's behavior patterns and enriched company profile.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Live Demo
 
-## What technologies are used for this project?
+👉 [https://intent-pulse-engage.lovable.app](https://intent-pulse-engage.lovable.app)
 
-This project is built with:
+---
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+*Built with ❤️ for the Continual Learning Hackathon with Intercom AI*
