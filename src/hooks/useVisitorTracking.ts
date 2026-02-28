@@ -88,6 +88,15 @@ function inferIntentLevel(
   return "low";
 }
 
+/** Quick client-side fallback messages keyed by page path */
+function getFallbackMessage(page: string): string {
+  if (page === "/pricing") return "Comparing plans? I can help you find the right fit for your team.";
+  if (page === "/docs") return "Exploring our docs? Let me know if you need help finding something.";
+  if (page === "/dashboard") return "Welcome to the dashboard — here's where the magic happens.";
+  if (page === "/demo") return "Ready to see IntentIQ in action? This demo is fully interactive.";
+  return "Welcome! Take a look around — I'll have personalized insights for you shortly.";
+}
+
 export function useVisitorTracking() {
   const location = useLocation();
   const pageEnteredAt = useRef(Date.now());
@@ -96,16 +105,36 @@ export function useVisitorTracking() {
   const [proactiveMessage, setProactiveMessage] = useState<ProactiveMessage | null>(null);
   const [intentLevel, setIntentLevel] = useState<IntentLevel>("low");
   const formPrompted = useRef(false);
+  const pendingRequest = useRef<AbortController | null>(null);
   const { getBehaviorData } = useBehaviorTracking();
 
   const sendPageData = useCallback(
     async (info: VisitorInfo | null, page: string, duration: number) => {
       if (!API_URL) return;
+
+      // Cancel any in-flight request from a previous page
+      pendingRequest.current?.abort();
+      const controller = new AbortController();
+      pendingRequest.current = controller;
+
+      // Show instant client-side fallback message
       const behavior = getBehaviorData();
+      const clientLevel = inferIntentLevel(
+        behavior.pages_visited, behavior.is_return_visitor,
+        behavior.scroll_depth, duration, behavior.referrer
+      );
+      setIntentLevel(clientLevel);
+      setProactiveMessage({
+        id: `fallback_${Date.now()}`,
+        content: getFallbackMessage(page),
+        intent_level: clientLevel,
+      });
+
       try {
         const res = await fetch(`${API_URL}/api/process-visitor`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             name: info?.name || "",
             email: info?.email || "",
@@ -124,6 +153,7 @@ export function useVisitorTracking() {
           setIntentLevel(level);
 
           if (data.message) {
+            // Upgrade fallback with AI-generated message
             setProactiveMessage({
               id: `msg_${Date.now()}`,
               content: data.message,
@@ -132,30 +162,27 @@ export function useVisitorTracking() {
               cta: data.cta,
             });
           }
-
-          // Form disabled — relying on proactive message widget only
         }
-      } catch {
-        // Fallback: infer intent client-side even if API fails
-        const behavior = getBehaviorData();
-        const elapsed = Math.round((Date.now() - pageEnteredAt.current) / 1000);
-        const level = inferIntentLevel(behavior.pages_visited, behavior.is_return_visitor, behavior.scroll_depth, elapsed, behavior.referrer);
-        setIntentLevel(level);
-        console.debug("[IntentIQ] Failed to send tracking data");
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        // Fallback already shown — just log
+        console.debug("[IntentIQ] Backend unavailable, using client-side message");
       }
     },
     [getBehaviorData]
   );
 
-  // Send on page enter (anonymous or identified)
+  // Send on page enter
   useEffect(() => {
     pageEnteredAt.current = Date.now();
     sendPageData(visitorInfo, location.pathname, 0);
 
     return () => {
+      // Send duration beacon on page leave (no duplicate fetch)
       const durationSec = Math.round(
         (Date.now() - pageEnteredAt.current) / 1000
       );
+      if (durationSec < 2) return; // Skip trivial visits
       const behavior = getBehaviorData();
       const payload = JSON.stringify({
         name: visitorInfo?.name || "",
@@ -172,29 +199,7 @@ export function useVisitorTracking() {
     };
   }, [location.pathname, visitorInfo, sendPageData, getBehaviorData]);
 
-  // Send on unload
-  useEffect(() => {
-    const handleUnload = () => {
-      const durationSec = Math.round(
-        (Date.now() - pageEnteredAt.current) / 1000
-      );
-      const behavior = getBehaviorData();
-      const payload = JSON.stringify({
-        name: visitorInfo?.name || "",
-        email: visitorInfo?.email || "",
-        company: visitorInfo?.company || "",
-        page: location.pathname,
-        time_on_page: durationSec,
-        ...behavior,
-      });
-      navigator.sendBeacon?.(
-        `${API_URL}/api/process-visitor`,
-        new Blob([payload], { type: "application/json" })
-      );
-    };
-    window.addEventListener("beforeunload", handleUnload);
-    return () => window.removeEventListener("beforeunload", handleUnload);
-  }, [visitorInfo, location.pathname, getBehaviorData]);
+  // beforeunload beacon handled by cleanup above — no duplicate listener needed
 
   const identifyVisitor = useCallback(
     (info: VisitorInfo) => {
