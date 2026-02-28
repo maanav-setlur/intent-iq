@@ -3,6 +3,7 @@ import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
+import { toast } from "@/hooks/use-toast";
 
 const links = [
   { to: "/", label: "Home" },
@@ -40,9 +41,9 @@ export function Navbar() {
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
-          <Button variant="ghost" size="sm">Log in</Button>
-          <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
-            Start Free Trial
+          <Button variant="ghost" size="sm" onClick={() => toast({ title: "Demo Mode", description: "Authentication is simulated in this demo." })}>Log in</Button>
+          <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90" asChild>
+            <Link to="/pricing">Start Free Trial</Link>
           </Button>
         </div>
 
@@ -73,9 +74,9 @@ export function Navbar() {
             ))}
           </nav>
           <div className="mt-3 flex flex-col gap-2">
-            <Button variant="ghost" size="sm">Log in</Button>
-            <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
-              Start Free Trial
+            <Button variant="ghost" size="sm" onClick={() => toast({ title: "Demo Mode", description: "Authentication is simulated in this demo." })}>Log in</Button>
+            <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90" asChild>
+              <Link to="/pricing">Start Free Trial</Link>
             </Button>
           </div>
         </div>
