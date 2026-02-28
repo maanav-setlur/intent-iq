@@ -128,25 +128,35 @@ export function useVisitorTracking() {
   const [intentLevel, setIntentLevel] = useState<IntentLevel>("low");
   const formPrompted = useRef(false);
   const pendingRequest = useRef<AbortController | null>(null);
+  const displayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { getBehaviorData } = useBehaviorTracking();
+
+  /** Queue a message to appear after a natural delay (5-7s) */
+  const showMessageWithDelay = useCallback((msg: ProactiveMessage) => {
+    if (displayTimer.current) clearTimeout(displayTimer.current);
+    const delay = 5000 + Math.random() * 2000; // 5-7 seconds
+    displayTimer.current = setTimeout(() => setProactiveMessage(msg), delay);
+  }, []);
 
   const sendPageData = useCallback(
     async (info: VisitorInfo | null, page: string, duration: number) => {
       if (!API_URL) return;
 
-      // Cancel any in-flight request from a previous page
+      // Cancel any in-flight request and pending display timer
       pendingRequest.current?.abort();
+      if (displayTimer.current) clearTimeout(displayTimer.current);
+      setProactiveMessage(null);
       const controller = new AbortController();
       pendingRequest.current = controller;
 
-      // Show instant client-side fallback message
+      // Prepare client-side fallback
       const behavior = getBehaviorData();
       const clientLevel = inferIntentLevel(
         behavior.pages_visited, behavior.is_return_visitor,
         behavior.scroll_depth, duration, behavior.referrer
       );
       setIntentLevel(clientLevel);
-      setProactiveMessage({
+      showMessageWithDelay({
         id: `fallback_${Date.now()}`,
         content: getFallbackMessage(page),
         intent_level: clientLevel,
@@ -175,8 +185,8 @@ export function useVisitorTracking() {
           setIntentLevel(level);
 
           if (data.message) {
-            // Upgrade fallback with AI-generated message
-            setProactiveMessage({
+            // Upgrade with AI-generated message (respects delay if still pending)
+            showMessageWithDelay({
               id: `msg_${Date.now()}`,
               content: cleanMessagePaths(data.message),
               intent_level: level,
