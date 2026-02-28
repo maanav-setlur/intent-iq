@@ -9,6 +9,7 @@ import Pricing from "./pages/Pricing";
 import Docs from "./pages/Docs";
 import Dashboard from "./pages/Dashboard";
 import Demo from "./pages/Demo";
+import BookDemo from "./pages/BookDemo";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/docs" element={<Docs />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/demo" element={<Demo />} />
+            <Route path="/book-demo" element={<BookDemo />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
