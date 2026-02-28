@@ -38,9 +38,9 @@ const CONTENT_CONFIG = {
     description:
       "Get the full guide on AI-powered visitor intent detection — strategies, benchmarks, and implementation playbooks.",
     cta: "Download White Paper",
-    successTitle: "Check your inbox!",
+    successTitle: "Your white paper is on its way!",
     successDescription:
-      "We've sent the white paper to your email. Look for it in the next few minutes.",
+      "You should receive it in your inbox shortly. Check your spam folder if you don't see it within a few minutes.",
   },
   demo: {
     icon: Play,
@@ -116,6 +116,9 @@ export function GatedContentModal({
             >
               Close
             </Button>
+            <p className="mt-3 text-xs text-muted-foreground/70 italic">
+              This is a demo project — no actual content will be delivered.
+            </p>
           </div>
         ) : (
           <>
