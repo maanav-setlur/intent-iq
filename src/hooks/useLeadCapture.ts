@@ -4,7 +4,7 @@ import type { GatedContentType } from "@/components/GatedContentModal";
 
 const API_URL =
   import.meta.env.VITE_TRACKING_API_URL ||
-  "https://intent-agent-backend.onrender.com";
+  "https://msetlur--intent-agent-backend-flask-app.modal.run";
 
 interface LeadPayload {
   name: string;
