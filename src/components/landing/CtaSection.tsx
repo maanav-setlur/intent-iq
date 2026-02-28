@@ -9,7 +9,7 @@ interface CtaSectionProps {
 
 export function CtaSection({ onOpenGated }: CtaSectionProps) {
   return (
-    <section className="border-t bg-hero-gradient">
+    <section className="relative overflow-hidden border-t bg-hero-gradient">
       <div className="bg-grid absolute inset-0 opacity-30" />
       <div className="container relative py-24 text-center">
         <h2 className="text-3xl font-bold tracking-tight md:text-4xl">
