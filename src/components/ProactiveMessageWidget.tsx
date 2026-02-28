@@ -44,8 +44,13 @@ export function ProactiveMessageWidget({ message, onDismiss }: Props) {
 
   const handleCta = () => {
     if (!message) return;
-    const url = message.cta?.url || "/pricing";
-    navigate(url);
+    const url = message.cta?.url || "/book-demo";
+    // External URLs open in new tab; internal paths use router
+    if (url.startsWith("http")) {
+      window.open(url, "_blank", "noopener");
+    } else {
+      navigate(url);
+    }
     onDismiss();
   };
 

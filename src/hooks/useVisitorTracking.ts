@@ -191,7 +191,9 @@ export function useVisitorTracking() {
               content: cleanMessagePaths(data.message),
               intent_level: level,
               researched_insights: undefined,
-              cta: data.cta,
+              cta: data.cta?.url?.includes("calendly.com/your-link")
+                ? { label: data.cta.label, url: "/book-demo" }
+                : data.cta,
             });
           }
         }
