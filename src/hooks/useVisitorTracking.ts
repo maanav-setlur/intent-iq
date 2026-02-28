@@ -142,6 +142,9 @@ export function useVisitorTracking() {
     async (info: VisitorInfo | null, page: string, duration: number) => {
       if (!API_URL) return;
 
+      // Suppress pop-up on demo screen
+      if (page === "/demo") return;
+
       // Cancel any in-flight request and pending display timer
       pendingRequest.current?.abort();
       if (displayTimer.current) clearTimeout(displayTimer.current);
