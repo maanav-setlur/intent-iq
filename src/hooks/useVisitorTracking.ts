@@ -58,6 +58,13 @@ function formatLearningStats(stats: Record<string, unknown>): string[] {
   return insights.length > 0 ? insights : [];
 }
 
+/** Clean raw paths like "/pricing" → "Pricing" in message text */
+function cleanMessagePaths(text: string): string {
+  return text.replace(/\/([a-z][-a-z]*)/gi, (_match, name: string) => {
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  });
+}
+
 /** Client-side intent scoring (0-100 scale) per PRD spec:
  *  score = (pricing_page_views * 40) + (time_on_pricing_seconds * 2)
  *        + (docs_page_views * 25) + (scroll_depth_percentage * 0.15)
@@ -171,7 +178,7 @@ export function useVisitorTracking() {
             // Upgrade fallback with AI-generated message
             setProactiveMessage({
               id: `msg_${Date.now()}`,
-              content: data.message,
+              content: cleanMessagePaths(data.message),
               intent_level: level,
               researched_insights: undefined,
               cta: data.cta,
