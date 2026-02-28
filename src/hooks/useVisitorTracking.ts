@@ -58,7 +58,11 @@ function formatLearningStats(stats: Record<string, unknown>): string[] {
   return insights.length > 0 ? insights : [];
 }
 
-/** Client-side intent scoring based on behavioral signals */
+/** Client-side intent scoring (0-100 scale) per PRD spec:
+ *  score = (pricing_page_views * 40) + (time_on_pricing_seconds * 2)
+ *        + (docs_page_views * 25) + (scroll_depth_percentage * 0.15)
+ *  Low: 0-39 | Medium: 40-69 | High: 70-100
+ *  We extend with return-visitor and referrer bonuses. */
 function inferIntentLevel(
   pagesVisited: string[],
   isReturn: boolean,
@@ -68,23 +72,34 @@ function inferIntentLevel(
 ): IntentLevel {
   let score = 0;
 
-  if (pagesVisited.includes("/pricing")) score += 3;
-  if (isReturn) score += 2;
+  // PRD: pricing page views weighted at 40 each
+  const pricingViews = pagesVisited.filter((p) => p === "/pricing").length;
+  score += pricingViews * 40;
 
+  // PRD: docs page views weighted at 25 each
+  const docsViews = pagesVisited.filter((p) => p === "/docs").length;
+  score += docsViews * 25;
+
+  // PRD: time on page * 2 (approximate — we only have total time, not per-page)
+  score += timeOnPage * 2;
+
+  // PRD: scroll depth * 0.15
+  score += scrollDepth * 0.15;
+
+  // Bonus signals (not in PRD formula but referenced in PRD context)
+  if (isReturn) score += 10;
+  if (/google|linkedin|bing/i.test(referrer)) score += 10;
+
+  // Multi-page engagement bonus
   const pageCount = pagesVisited.length;
-  if (pageCount >= 3) score += 2;
-  else if (pageCount >= 2) score += 1;
+  if (pageCount >= 4) score += 10;
+  else if (pageCount >= 3) score += 5;
 
-  if (scrollDepth > 85) score += 2;
-  else if (scrollDepth > 60) score += 1;
+  // Clamp to 0-100
+  score = Math.min(100, Math.max(0, Math.round(score)));
 
-  if (timeOnPage > 60) score += 2;
-  else if (timeOnPage > 30) score += 1;
-
-  if (/google|linkedin|bing/i.test(referrer)) score += 2;
-
-  if (score >= 5) return "high";
-  if (score >= 2) return "medium";
+  if (score >= 70) return "high";
+  if (score >= 40) return "medium";
   return "low";
 }
 
